@@ -1,0 +1,63 @@
+module Charity::CharityModule {
+
+    use std::signer;
+    use std::vector;
+    use aptos_framework::coin::{self, Coin};
+    use aptos_framework::aptos_coin::AptosCoin;
+    use aptos_framework::timestamp;
+
+    
+    struct NGO has key {
+        addr: address,
+        total_donations: u64,
+        proofs: vector<Proof>
+    }
+
+    
+    struct Proof has copy, drop, store {
+        id: u64,
+        ipfs_hash: vector<u8>,
+        amount: u64,
+        timestamp: u64
+    }
+
+    
+    public entry fun init(ngo: &signer) {
+        let ngo_addr = signer::address_of(ngo);
+        move_to(ngo, NGO { 
+            addr: ngo_addr, 
+            total_donations: 0,
+            proofs: vector::empty<Proof>()
+        });
+    }
+
+    
+    public entry fun donate(donor: &signer, amount: u64) {
+        let ngo_ref = borrow_global_mut<NGO>(@0xYourNgoAddress); // NGO fixed
+        let coin = coin::withdraw<AptosCoin>(donor, amount);
+        coin::deposit<AptosCoin>(ngo_ref.addr, coin);
+
+        ngo_ref.total_donations = ngo_ref.total_donations + amount;
+    }
+
+    
+    public entry fun withdraw(ngo: &signer, amount: u64, ipfs_hash: vector<u8>) {
+        let ngo_addr = signer::address_of(ngo);
+        let ngo_ref = borrow_global_mut<NGO>(ngo_addr);
+
+        let coin = coin::withdraw<AptosCoin>(ngo, amount);
+        coin::deposit<AptosCoin>(ngo_addr, coin);
+
+        let new_proof = Proof {
+            id: vector::length(&ngo_ref.proofs) + 1,
+            ipfs_hash,
+            amount,
+            timestamp: timestamp::now_seconds()
+        };
+        vector::push_back(&mut ngo_ref.proofs, new_proof);
+
+    public fun get_proofs(addr: address): vector<Proof> acquires NGO {
+        let ngo_ref = borrow_global<NGO>(addr);
+        ngo_ref.proofs
+    }
+}
