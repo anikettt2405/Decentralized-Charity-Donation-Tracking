@@ -1,0 +1,47 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+contract Charity {
+    address public ngo; // NGO account
+    uint public totalDonations;
+
+    struct Proof {
+        uint id;
+        string ipfsHash;  // Proof of fund usage
+        uint amount;
+        uint timestamp;
+    }
+
+    mapping(address => uint) public donorBalances;
+    Proof[] public proofs;
+
+    event Donated(address indexed donor, uint amount);
+    event Withdrawn(uint amount, string ipfsHash);
+
+    constructor() {
+        ngo = msg.sender; // deployer = NGO
+    }
+
+    // Donate ETH
+    function donate() public payable {
+        require(msg.value > 0, "Donation must be > 0");
+        donorBalances[msg.sender] += msg.value;
+        totalDonations += msg.value;
+        emit Donated(msg.sender, msg.value);
+    }
+
+    // NGO withdraws money & uploads proof
+    function withdraw(uint amount, string memory ipfsHash) public {
+        require(msg.sender == ngo, "Only NGO can withdraw");
+        require(amount <= address(this).balance, "Not enough funds");
+        payable(ngo).transfer(amount);
+
+        proofs.push(Proof(proofs.length + 1, ipfsHash, amount, block.timestamp));
+        emit Withdrawn(amount, ipfsHash);
+    }
+
+    // Get all proofs of withdrawals
+    function getProofs() public view returns (Proof[] memory) {
+        return proofs;
+    }
+}
